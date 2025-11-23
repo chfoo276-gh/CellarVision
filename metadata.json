@@ -1,0 +1,7 @@
+{
+  "name": "MyCellar",
+  "description": "A visual, intuitive, and data-rich application for managing personal wine collections with AI-powered label scanning.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
