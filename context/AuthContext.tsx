@@ -1,7 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useGoogleLogin, googleLogout } from '@react-oauth/google';
-import { initGapiClient, syncFromCloud } from '../services/cloudService';
-import { setCloudSyncEnabled } from '../services/storageService';
+import { initGapiClient, syncFromCloud, setCloudSyncEnabled } from '../services/cloudService';
 
 interface UserProfile {
   name: string;
@@ -76,7 +75,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     },
     onError: (error) => console.log('Login Failed:', error),
     scope: 'https://www.googleapis.com/auth/drive.file profile email', // Request Drive access
-    prompt: 'select_account', // Forces the account selection screen
+    prompt: 'select_account',
   });
 
   const logout = () => {

@@ -1,24 +1,14 @@
 import { Bottle, BottleStatus, StorageUnit, Stats, WineType, UserSettings, Coordinates } from '../types';
-import { syncToCloud } from './cloudService';
+import { syncToCloud, getCloudSyncEnabled } from './cloudService';
 
 const STORAGE_KEY_CELLARS = 'cv_cellars';
 const STORAGE_KEY_BOTTLES = 'cv_bottles';
 const STORAGE_KEY_SETTINGS = 'cv_settings';
 
-// Helper to generate UUIDs
 const generateId = () => Math.random().toString(36).substring(2, 9);
 
-// --- CLOUD SYNC HELPERS ---
-
-let isCloudSyncEnabled = false;
-
-export const setCloudSyncEnabled = (enabled: boolean) => {
-  isCloudSyncEnabled = enabled;
-};
-
 const triggerSync = () => {
-  if (isCloudSyncEnabled) {
-    // Fire and forget - doesn't block UI
+  if (getCloudSyncEnabled()) {
     syncToCloud().catch(err => console.error("Background sync failed", err));
   }
 };
@@ -40,7 +30,6 @@ export const clearAllData = (): void => {
 export const importData = (jsonString: string): void => {
   try {
     const data = JSON.parse(jsonString);
-    // Overwrite local storage with cloud data
     if (data.cellars) localStorage.setItem(STORAGE_KEY_CELLARS, JSON.stringify(data.cellars));
     if (data.bottles) localStorage.setItem(STORAGE_KEY_BOTTLES, JSON.stringify(data.bottles));
     if (data.settings) localStorage.setItem(STORAGE_KEY_SETTINGS, JSON.stringify(data.settings));
@@ -48,7 +37,6 @@ export const importData = (jsonString: string): void => {
     console.error("Failed to import data", e);
   }
 };
-
 
 // --- Settings ---
 
@@ -125,18 +113,16 @@ export const searchBottles = (query: string): Bottle[] => {
       b.country?.toLowerCase().includes(lowerQuery) ||
       b.vintage.toString().includes(lowerQuery)
     )
-  ).slice(0, 10); // Limit results
+  ).slice(0, 10);
 };
 
 export const getBottlesByCellar = (cellarId: string): Bottle[] => {
   const bottles = getBottles();
-  // Returns bottles assigned to this cellar (both placed in slots and loose/unplaced within this cellar)
   return bottles.filter((b) => b.storageId === cellarId && b.status === BottleStatus.ACTIVE);
 };
 
 export const getUnplacedBottles = (): Bottle[] => {
   const bottles = getBottles();
-  // Returns bottles that have NO storage ID assigned at all
   return bottles.filter((b) => !b.storageId && b.status === BottleStatus.ACTIVE);
 };
 
@@ -174,7 +160,6 @@ export const deleteBottle = (id: string): void => {
 export const duplicateBottle = (id: string, count: number): void => {
   const bottles = getBottles();
   const sourceBottle = bottles.find(b => b.id === id);
-  
   if (!sourceBottle) return;
 
   for (let i = 0; i < count; i++) {
@@ -182,16 +167,15 @@ export const duplicateBottle = (id: string, count: number): void => {
       ...sourceBottle,
       id: generateId(),
       dateAdded: Date.now(),
-      status: BottleStatus.ACTIVE, // Always duplicate as active, even if source is consumed
-      storageId: undefined, // Duplicates must start as unplaced to avoid grid conflict
-      coordinates: undefined, // Duplicates must start as unplaced
+      status: BottleStatus.ACTIVE,
+      storageId: undefined,
+      coordinates: undefined,
       dateConsumed: undefined,
       rating: undefined,
       notes: undefined
     };
     bottles.push(newBottle);
   }
-  
   localStorage.setItem(STORAGE_KEY_BOTTLES, JSON.stringify(bottles));
   triggerSync();
 };
@@ -225,7 +209,7 @@ export const updateBottle = (id: string, updates: Partial<Bottle>): Bottle | nul
 export const moveBottle = (bottleId: string, storageId: string | undefined, coordinates?: Coordinates): Bottle | null => {
   const result = updateBottle(bottleId, {
     storageId,
-    coordinates: coordinates // If undefined, it removes the coordinates (making it loose in the cellar)
+    coordinates: coordinates 
   });
   return result;
 };
@@ -248,7 +232,6 @@ export const getDistinctVarietals = (): string[] => {
 
 export const getStats = (): Stats => {
   const bottles = getBottles().filter((b) => b.status === BottleStatus.ACTIVE);
-  
   const totalValue = bottles.reduce((sum, bottle) => {
     const price = bottle.currentPrice ?? bottle.purchasePrice ?? 0;
     return sum + price;
@@ -270,7 +253,6 @@ export const isSlotOccupied = (storageId: string, row: number, col: number): boo
   return bottles.some(b => b.coordinates?.row === row && b.coordinates?.col === col);
 };
 
-// Seed initial data if empty
 if (!localStorage.getItem(STORAGE_KEY_CELLARS)) {
   const defaultCellar = {
     id: 'default_kitchen',
