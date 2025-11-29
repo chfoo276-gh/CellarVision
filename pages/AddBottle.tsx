@@ -1,9 +1,9 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Camera, Loader2, ArrowRight, Save } from 'lucide-react';
+import { Camera, Loader2, ArrowRight, Save, UploadCloud } from 'lucide-react';
 import { analyzeWineLabel, ScannedWineData } from '../services/geminiService';
-import { getCellars, saveBottle, getSettings, getDistinctVarietals } from '../services/storageService';
+import { getCellars, saveBottle, getSettings, getDistinctVarietals, compressImage } from '../services/storageService';
 import { StorageUnit, WineType, BottleStatus } from '../types';
 import CellarGrid from '../components/CellarGrid';
 
@@ -17,6 +17,7 @@ const AddBottle: React.FC = () => {
   const navigate = useNavigate();
   const [step, setStep] = useState<Step>(Step.SCAN);
   const [isLoading, setIsLoading] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [currencySymbol, setCurrencySymbol] = useState('$');
   const [existingVarietals, setExistingVarietals] = useState<string[]>([]);
@@ -44,27 +45,51 @@ const AddBottle: React.FC = () => {
     setExistingVarietals(getDistinctVarietals());
   }, []);
 
+  const processFile = async (file: File) => {
+    setIsLoading(true);
+    try {
+      // Compress the image before using it
+      const compressedBase64 = await compressImage(file);
+      setImagePreview(compressedBase64);
+      
+      // Call Gemini with compressed image
+      const data = await analyzeWineLabel(compressedBase64);
+      setFormData(prev => ({ ...prev, ...data }));
+      setStep(Step.CONFIRM);
+    } catch (error) {
+      console.error("Analysis or Compression Failed", error);
+      alert("Failed to process image. It might be too large or invalid.");
+      setStep(Step.CONFIRM);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      setIsLoading(true);
-      const reader = new FileReader();
-      reader.onloadend = async () => {
-        const base64 = reader.result as string;
-        setImagePreview(base64);
-        try {
-          // Call Gemini
-          const data = await analyzeWineLabel(base64);
-          setFormData(prev => ({ ...prev, ...data }));
-          setStep(Step.CONFIRM);
-        } catch (error) {
-          alert("Failed to analyze image. Please fill details manually.");
-          setStep(Step.CONFIRM);
-        } finally {
-          setIsLoading(false);
-        }
-      };
-      reader.readAsDataURL(file);
+    if (file) await processFile(file);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    
+    const file = e.dataTransfer.files?.[0];
+    if (file && file.type.startsWith('image/')) {
+      await processFile(file);
     }
   };
 
@@ -84,26 +109,30 @@ const AddBottle: React.FC = () => {
   const saveToInventory = (isUnplaced: boolean = false) => {
     if (!isUnplaced && (!selectedCellarId || !selectedSlot)) return;
 
-    saveBottle({
-      producer: formData.producer!,
-      varietal: formData.varietal!,
-      vintage: formData.vintage!,
-      type: formData.type!,
-      region: formData.region,
-      country: formData.country,
-      photoUrl: imagePreview || undefined,
-      status: BottleStatus.ACTIVE,
-      storageId: isUnplaced ? undefined : selectedCellarId,
-      coordinates: isUnplaced ? undefined : selectedSlot!,
-      dateAdded: Date.now(),
-      purchasePrice: formData.purchasePrice,
-      currentPrice: formData.purchasePrice // Default to purchase price
-    });
+    try {
+        saveBottle({
+          producer: formData.producer!,
+          varietal: formData.varietal!,
+          vintage: formData.vintage!,
+          type: formData.type!,
+          region: formData.region,
+          country: formData.country,
+          photoUrl: imagePreview || undefined,
+          status: BottleStatus.ACTIVE,
+          storageId: isUnplaced ? undefined : selectedCellarId,
+          coordinates: isUnplaced ? undefined : selectedSlot!,
+          dateAdded: Date.now(),
+          purchasePrice: formData.purchasePrice,
+          currentPrice: formData.purchasePrice
+        });
 
-    if (isUnplaced) {
-      navigate('/');
-    } else {
-      navigate(`/cellars/${selectedCellarId}`);
+        if (isUnplaced) {
+          navigate('/');
+        } else {
+          navigate(`/cellars/${selectedCellarId}`);
+        }
+    } catch (e) {
+        // Error is alerted in storageService
     }
   };
 
@@ -120,15 +149,26 @@ const AddBottle: React.FC = () => {
         <button
           disabled={isLoading}
           onClick={() => fileInputRef.current?.click()}
-          className="flex flex-col items-center justify-center p-12 bg-zinc-900 border-2 border-dashed border-zinc-700 rounded-xl hover:border-rose-500 hover:bg-zinc-800 transition-all group"
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+          className={`flex flex-col items-center justify-center p-12 bg-zinc-900 border-2 border-dashed rounded-xl transition-all group ${
+            isDragging 
+              ? 'border-emerald-500 bg-zinc-800 scale-[1.02]' 
+              : 'border-zinc-700 hover:border-rose-500 hover:bg-zinc-800'
+          }`}
         >
           {isLoading ? (
             <Loader2 className="animate-spin text-rose-500 mb-4" size={48} />
+          ) : isDragging ? (
+            <UploadCloud className="text-emerald-500 mb-4 animate-bounce" size={48} />
           ) : (
             <Camera className="text-zinc-500 group-hover:text-rose-500 mb-4 transition-colors" size={48} />
           )}
-          <span className="font-medium text-lg text-zinc-300">Take Photo / Upload</span>
-          <span className="text-sm text-zinc-500 mt-2">{isLoading ? 'Analyzing with AI...' : 'Supported: JPG, PNG'}</span>
+          <span className={`font-medium text-lg ${isDragging ? 'text-emerald-400' : 'text-zinc-300'}`}>
+            {isDragging ? 'Drop Image Here' : 'Take Photo / Upload'}
+          </span>
+          <span className="text-sm text-zinc-500 mt-2">{isLoading ? 'Processing...' : 'Drag & Drop or Click'}</span>
         </button>
         
         <button

@@ -1,9 +1,9 @@
 
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { getBottleById, consumeBottle, getCellarById, updateBottle, getSettings, duplicateBottle, deleteBottle, getCellars, getBottlesByCellar, moveBottle } from '../services/storageService';
+import { getBottleById, consumeBottle, getCellarById, updateBottle, getSettings, duplicateBottle, deleteBottle, getCellars, getBottlesByCellar, moveBottle, compressImage } from '../services/storageService';
 import { Bottle, BottleStatus, StorageUnit } from '../types';
-import { ArrowLeft, Hash, Calendar, CheckCircle2, Wine, DollarSign, Pencil, Save, X, Globe, AlertCircle, Copy, Camera, Trash2 } from 'lucide-react';
+import { ArrowLeft, Hash, Calendar, CheckCircle2, Wine, DollarSign, Pencil, Save, X, Globe, AlertCircle, Copy, Camera, Trash2, UploadCloud } from 'lucide-react';
 import { WINE_TEXT_COLOR_MAP } from '../constants';
 import CellarGrid from '../components/CellarGrid';
 
@@ -14,6 +14,7 @@ const BottleDetail: React.FC = () => {
   const [cellarName, setCellarName] = useState('');
   const [currencySymbol, setCurrencySymbol] = useState('$');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isDragging, setIsDragging] = useState(false);
   
   // Consume Modal State
   const [isConsuming, setIsConsuming] = useState(false);
@@ -170,16 +171,46 @@ const BottleDetail: React.FC = () => {
     }
   };
 
+  const processImageFile = (file: File) => {
+      compressImage(file).then(base64 => {
+          if (bottle) {
+            updateBottle(bottle.id, { photoUrl: base64 });
+            setBottle({ ...bottle, photoUrl: base64 });
+          }
+      }).catch(err => {
+          console.error("Compression failed", err);
+          alert("Could not update image. Storage might be full.");
+      });
+  };
+
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file && bottle) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const base64 = reader.result as string;
-        updateBottle(bottle.id, { photoUrl: base64 });
-        setBottle({ ...bottle, photoUrl: base64 });
-      };
-      reader.readAsDataURL(file);
+    if (file) processImageFile(file);
+  };
+
+  // Drag and Drop Handlers for Image
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!isConsumed) setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    
+    if (!isConsumed) {
+      const file = e.dataTransfer.files?.[0];
+      if (file && file.type.startsWith('image/')) {
+        processImageFile(file);
+      }
     }
   };
 
@@ -240,15 +271,29 @@ const BottleDetail: React.FC = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
         {/* Image Section */}
         <div>
-            <div className="relative aspect-[3/4] bg-zinc-900 rounded-xl overflow-hidden border border-zinc-800 shadow-xl group">
+            <div 
+                className={`relative aspect-[3/4] bg-zinc-900 rounded-xl overflow-hidden border transition-all shadow-xl group ${isDragging ? 'border-emerald-500 ring-2 ring-emerald-500/50' : 'border-zinc-800'}`}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+            >
             {bottle.photoUrl ? (
                 <img src={bottle.photoUrl} alt="Bottle Label" className="w-full h-full object-cover" />
             ) : (
                 <div className="w-full h-full flex flex-col items-center justify-center text-zinc-700">
-                <Wine size={64} className="mb-4 opacity-50" />
-                <span className="text-sm">No Image Provided</span>
+                {isDragging ? <UploadCloud size={48} className="text-emerald-500 animate-bounce" /> : <Wine size={64} className="mb-4 opacity-50" />}
+                <span className="text-sm">{isDragging ? 'Drop to Upload' : 'No Image Provided'}</span>
                 </div>
             )}
+            
+            {/* Drag Overlay hint if dragged but has image */}
+            {isDragging && bottle.photoUrl && (
+                <div className="absolute inset-0 bg-black/70 flex flex-col items-center justify-center text-emerald-400">
+                    <UploadCloud size={48} className="mb-2" />
+                    <span className="font-bold">Drop to Replace</span>
+                </div>
+            )}
+
             {isConsumed && (
                 <div className="absolute inset-0 bg-black/60 flex items-center justify-center backdrop-blur-sm">
                     <div className="bg-emerald-600 text-white px-6 py-2 rounded-full font-bold flex items-center gap-2">
@@ -369,7 +414,7 @@ const BottleDetail: React.FC = () => {
            <div className="bg-zinc-900 p-4 rounded-xl border border-zinc-800 space-y-3">
              <div className="flex items-center gap-3 text-zinc-300">
                 <Hash className={bottle.storageId ? "text-zinc-500" : "text-yellow-500"} size={20} />
-                <div className="flex-1">
+                <div>
                   <p className="text-xs text-zinc-500 uppercase">Location</p>
                   <div className="flex items-center justify-between">
                       <p className="font-medium flex items-center gap-2">

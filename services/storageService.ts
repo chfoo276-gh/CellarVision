@@ -13,6 +13,65 @@ const triggerSync = () => {
   }
 };
 
+// --- IMAGE COMPRESSION HELPER ---
+export const compressImage = (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = (event) => {
+      const img = new Image();
+      img.src = event.target?.result as string;
+      img.onload = () => {
+        // Max dimension
+        const MAX_SIZE = 800;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > MAX_SIZE) {
+            height *= MAX_SIZE / width;
+            width = MAX_SIZE;
+          }
+        } else {
+          if (height > MAX_SIZE) {
+            width *= MAX_SIZE / height;
+            height = MAX_SIZE;
+          }
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+            reject(new Error("Could not get canvas context"));
+            return;
+        }
+        ctx.drawImage(img, 0, 0, width, height);
+        
+        // Convert to JPEG at 60% quality (drastically smaller than PNG)
+        resolve(canvas.toDataURL('image/jpeg', 0.6)); 
+      };
+      img.onerror = (err) => reject(err);
+    };
+    reader.onerror = (err) => reject(err);
+  });
+};
+
+// --- SAFE STORAGE HELPERS ---
+const safeSetItem = (key: string, value: string) => {
+    try {
+        localStorage.setItem(key, value);
+    } catch (e: any) {
+        if (e.name === 'QuotaExceededError' || e.name === 'NS_ERROR_DOM_QUOTA_REACHED') {
+            alert("Storage Full! Unable to save. Please delete some items or remove photos to free up space.");
+            throw e; // Re-throw to stop execution flow
+        }
+        console.error("Storage Error", e);
+    }
+};
+
 export const exportData = (): string => {
   return JSON.stringify({
     cellars: getCellars(),
@@ -30,16 +89,16 @@ export const clearAllData = (): void => {
 export const importData = (jsonString: string): void => {
   try {
     const data = JSON.parse(jsonString);
-    if (data.cellars) localStorage.setItem(STORAGE_KEY_CELLARS, JSON.stringify(data.cellars));
-    if (data.bottles) localStorage.setItem(STORAGE_KEY_BOTTLES, JSON.stringify(data.bottles));
-    if (data.settings) localStorage.setItem(STORAGE_KEY_SETTINGS, JSON.stringify(data.settings));
+    if (data.cellars) safeSetItem(STORAGE_KEY_CELLARS, JSON.stringify(data.cellars));
+    if (data.bottles) safeSetItem(STORAGE_KEY_BOTTLES, JSON.stringify(data.bottles));
+    if (data.settings) safeSetItem(STORAGE_KEY_SETTINGS, JSON.stringify(data.settings));
   } catch (e) {
     console.error("Failed to import data", e);
-    throw e; // Re-throw to allow UI to catch invalid JSON
+    throw e; 
   }
 };
 
-// Alias for semantic clarity when using "Restore from Backup" feature
+// Alias for semantic clarity
 export const fullRestore = importData;
 
 // --- Settings ---
@@ -55,7 +114,7 @@ export const getSettings = (): UserSettings => {
 };
 
 export const saveSettings = (settings: UserSettings): UserSettings => {
-  localStorage.setItem(STORAGE_KEY_SETTINGS, JSON.stringify(settings));
+  safeSetItem(STORAGE_KEY_SETTINGS, JSON.stringify(settings));
   triggerSync();
   return settings;
 };
@@ -76,7 +135,7 @@ export const saveCellar = (cellar: Omit<StorageUnit, 'id'>): StorageUnit => {
   const cellars = getCellars();
   const newCellar = { ...cellar, id: generateId() };
   cellars.push(newCellar);
-  localStorage.setItem(STORAGE_KEY_CELLARS, JSON.stringify(cellars));
+  safeSetItem(STORAGE_KEY_CELLARS, JSON.stringify(cellars));
   triggerSync();
   return newCellar;
 };
@@ -87,7 +146,7 @@ export const updateCellar = (id: string, updates: Partial<StorageUnit>): Storage
   if (index === -1) return null;
 
   cellars[index] = { ...cellars[index], ...updates };
-  localStorage.setItem(STORAGE_KEY_CELLARS, JSON.stringify(cellars));
+  safeSetItem(STORAGE_KEY_CELLARS, JSON.stringify(cellars));
   triggerSync();
   return cellars[index];
 };
@@ -149,7 +208,7 @@ export const saveBottle = (bottle: Omit<Bottle, 'id'>): Bottle => {
     id: generateId() 
   };
   bottles.push(newBottle);
-  localStorage.setItem(STORAGE_KEY_BOTTLES, JSON.stringify(bottles));
+  safeSetItem(STORAGE_KEY_BOTTLES, JSON.stringify(bottles));
   triggerSync();
   return newBottle;
 };
@@ -157,7 +216,7 @@ export const saveBottle = (bottle: Omit<Bottle, 'id'>): Bottle => {
 export const deleteBottle = (id: string): void => {
   const bottles = getBottles();
   const newBottles = bottles.filter(b => b.id !== id);
-  localStorage.setItem(STORAGE_KEY_BOTTLES, JSON.stringify(newBottles));
+  safeSetItem(STORAGE_KEY_BOTTLES, JSON.stringify(newBottles));
   triggerSync();
 };
 
@@ -180,7 +239,7 @@ export const duplicateBottle = (id: string, count: number): void => {
     };
     bottles.push(newBottle);
   }
-  localStorage.setItem(STORAGE_KEY_BOTTLES, JSON.stringify(bottles));
+  safeSetItem(STORAGE_KEY_BOTTLES, JSON.stringify(bottles));
   triggerSync();
 };
 
@@ -195,7 +254,7 @@ export const bulkSaveBottles = (newBottles: Omit<Bottle, 'id'>[]): void => {
           id: generateId()
       });
   });
-  localStorage.setItem(STORAGE_KEY_BOTTLES, JSON.stringify(bottles));
+  safeSetItem(STORAGE_KEY_BOTTLES, JSON.stringify(bottles));
   triggerSync();
 };
 
@@ -205,7 +264,7 @@ export const updateBottle = (id: string, updates: Partial<Bottle>): Bottle | nul
   if (index === -1) return null;
 
   bottles[index] = { ...bottles[index], ...updates };
-  localStorage.setItem(STORAGE_KEY_BOTTLES, JSON.stringify(bottles));
+  safeSetItem(STORAGE_KEY_BOTTLES, JSON.stringify(bottles));
   triggerSync();
   return bottles[index];
 };
