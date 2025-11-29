@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Bottle, StorageUnit, WineType } from '../types';
 import { WINE_COLOR_MAP } from '../constants';
@@ -41,10 +40,10 @@ const CellarGrid: React.FC<CellarGridProps> = ({ cellar, bottles, onSlotClick, h
       const bottle = getBottleAt(r, c);
       const isOccupied = !!bottle;
       
-      let cellClass = "w-10 h-10 md:w-14 md:h-14 rounded-full flex items-center justify-center transition-all duration-200 cursor-pointer border-2 relative group overflow-hidden ";
+      let cellClass = "w-10 h-10 md:w-14 md:h-14 rounded-full flex items-center justify-center transition-all duration-200 cursor-pointer border-2 relative group ";
       
       if (isOccupied) {
-        cellClass += WINE_COLOR_MAP[bottle.type] + " shadow-lg hover:brightness-110 hover:scale-105 cursor-grab active:cursor-grabbing";
+        cellClass += WINE_COLOR_MAP[bottle.type] + " shadow-lg hover:brightness-110 hover:scale-105 cursor-grab active:cursor-grabbing z-10 hover:z-20";
       } else {
         cellClass += highlightEmpty 
           ? "bg-zinc-800 border-zinc-600 hover:border-emerald-500 hover:bg-emerald-900/20"
@@ -66,7 +65,7 @@ const CellarGrid: React.FC<CellarGridProps> = ({ cellar, bottles, onSlotClick, h
               <img 
                 src={bottle.photoUrl} 
                 alt="bottle" 
-                className="w-full h-full object-cover opacity-90 pointer-events-none"
+                className="w-full h-full object-cover rounded-full opacity-90 pointer-events-none"
               />
             ) : (
               <span className="text-[10px] md:text-xs font-bold text-zinc-950 opacity-60 pointer-events-none">
@@ -77,11 +76,14 @@ const CellarGrid: React.FC<CellarGridProps> = ({ cellar, bottles, onSlotClick, h
              <span className="text-zinc-700 text-[9px] md:text-[10px] pointer-events-none">{r+1}-{c+1}</span>
           )}
           
-          {/* Tooltip for desktop */}
+          {/* Enhanced Tooltip */}
           {isOccupied && (
-            <div className="absolute bottom-full mb-2 hidden group-hover:block w-32 bg-black/90 text-white text-xs rounded p-2 z-10 pointer-events-none left-1/2 transform -translate-x-1/2">
-              <p className="font-bold truncate">{bottle.producer}</p>
-              <p className="truncate">{bottle.varietal}</p>
+            <div className="absolute bottom-full mb-2 hidden group-hover:block w-40 bg-zinc-950 border border-zinc-700 text-white text-xs rounded-lg p-2 shadow-2xl z-50 left-1/2 transform -translate-x-1/2 pointer-events-none animate-in fade-in zoom-in-95 duration-200">
+              <p className="font-bold truncate text-rose-400">{bottle.producer}</p>
+              <p className="truncate text-zinc-300">{bottle.vintage} {bottle.varietal}</p>
+              {bottle.currentPrice && <p className="text-[10px] text-emerald-500 mt-1">Current: {bottle.currentPrice}</p>}
+              {/* Little arrow at bottom */}
+              <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-2 h-2 bg-zinc-950 border-r border-b border-zinc-700 rotate-45"></div>
             </div>
           )}
         </div>
@@ -95,7 +97,7 @@ const CellarGrid: React.FC<CellarGridProps> = ({ cellar, bottles, onSlotClick, h
   }
 
   return (
-    <div className="flex flex-col gap-2 md:gap-3 p-4 bg-zinc-950/50 rounded-xl border border-zinc-800 overflow-x-auto">
+    <div className="flex flex-col gap-2 md:gap-3 p-4 bg-zinc-950/50 rounded-xl border border-zinc-800 overflow-visible">
        {/* Top shelf is Row 0 visually */}
       {gridRows}
     </div>
