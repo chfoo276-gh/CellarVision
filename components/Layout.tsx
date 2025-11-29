@@ -1,12 +1,12 @@
-
 import React from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, PlusCircle, History, Wine, Settings } from 'lucide-react';
+import { LayoutDashboard, PlusCircle, History, Wine, Settings, LogOut } from 'lucide-react';
 import SearchBar from './SearchBar';
+import { useAuth } from '../context/AuthContext';
 
 const Layout: React.FC = () => {
   const location = useLocation();
-
+  const { user, logout } = useAuth();
   const isActive = (path: string) => location.pathname === path;
 
   const navItems = [
@@ -25,6 +25,11 @@ const Layout: React.FC = () => {
             <Wine className="text-rose-500" />
             <span className="font-bold text-lg">CellarVision</span>
           </div>
+          {user && (
+            <button onClick={logout} className="text-zinc-500 hover:text-white">
+              <LogOut size={20} />
+            </button>
+          )}
         </div>
         <div className="px-4 pb-3">
           <SearchBar />
@@ -60,7 +65,24 @@ const Layout: React.FC = () => {
         </nav>
 
         <div className="p-4 border-t border-zinc-800">
-          <p className="text-xs text-zinc-600 text-center">MVP Version 1.0</p>
+          {user ? (
+            <div className="flex items-center justify-between px-2 mb-3">
+               <div className="flex items-center gap-2 overflow-hidden">
+                  {user.picture ? (
+                    <img src={user.picture} alt="User" className="w-6 h-6 rounded-full" />
+                  ) : (
+                    <div className="w-6 h-6 rounded-full bg-zinc-700 flex items-center justify-center text-xs">{user.name.charAt(0)}</div>
+                  )}
+                  <span className="text-sm font-medium text-zinc-400 truncate">{user.name}</span>
+               </div>
+               <button onClick={logout} className="text-zinc-500 hover:text-rose-500 transition-colors" title="Logout">
+                  <LogOut size={16} />
+               </button>
+            </div>
+          ) : (
+             <p className="text-xs text-center text-zinc-500 mb-2">Guest Mode</p>
+          )}
+          <p className="text-xs text-zinc-700 text-center">MVP Version 1.1</p>
         </div>
       </div>
 

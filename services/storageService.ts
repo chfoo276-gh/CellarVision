@@ -1,5 +1,5 @@
-
 import { Bottle, BottleStatus, StorageUnit, Stats, WineType, UserSettings, Coordinates } from '../types';
+import { syncToCloud } from './cloudService';
 
 const STORAGE_KEY_CELLARS = 'cv_cellars';
 const STORAGE_KEY_BOTTLES = 'cv_bottles';
@@ -7,6 +7,42 @@ const STORAGE_KEY_SETTINGS = 'cv_settings';
 
 // Helper to generate UUIDs
 const generateId = () => Math.random().toString(36).substring(2, 9);
+
+// --- CLOUD SYNC HELPERS ---
+
+let isCloudSyncEnabled = false;
+
+export const setCloudSyncEnabled = (enabled: boolean) => {
+  isCloudSyncEnabled = enabled;
+};
+
+const triggerSync = () => {
+  if (isCloudSyncEnabled) {
+    // Fire and forget - doesn't block UI
+    syncToCloud().catch(err => console.error("Background sync failed", err));
+  }
+};
+
+export const exportData = (): string => {
+  return JSON.stringify({
+    cellars: getCellars(),
+    bottles: getBottles(),
+    settings: getSettings()
+  });
+};
+
+export const importData = (jsonString: string): void => {
+  try {
+    const data = JSON.parse(jsonString);
+    // Overwrite local storage with cloud data
+    if (data.cellars) localStorage.setItem(STORAGE_KEY_CELLARS, JSON.stringify(data.cellars));
+    if (data.bottles) localStorage.setItem(STORAGE_KEY_BOTTLES, JSON.stringify(data.bottles));
+    if (data.settings) localStorage.setItem(STORAGE_KEY_SETTINGS, JSON.stringify(data.settings));
+  } catch (e) {
+    console.error("Failed to import data", e);
+  }
+};
+
 
 // --- Settings ---
 
@@ -22,6 +58,7 @@ export const getSettings = (): UserSettings => {
 
 export const saveSettings = (settings: UserSettings): UserSettings => {
   localStorage.setItem(STORAGE_KEY_SETTINGS, JSON.stringify(settings));
+  triggerSync();
   return settings;
 };
 
@@ -42,6 +79,7 @@ export const saveCellar = (cellar: Omit<StorageUnit, 'id'>): StorageUnit => {
   const newCellar = { ...cellar, id: generateId() };
   cellars.push(newCellar);
   localStorage.setItem(STORAGE_KEY_CELLARS, JSON.stringify(cellars));
+  triggerSync();
   return newCellar;
 };
 
@@ -52,6 +90,7 @@ export const updateCellar = (id: string, updates: Partial<StorageUnit>): Storage
 
   cellars[index] = { ...cellars[index], ...updates };
   localStorage.setItem(STORAGE_KEY_CELLARS, JSON.stringify(cellars));
+  triggerSync();
   return cellars[index];
 };
 
@@ -115,6 +154,7 @@ export const saveBottle = (bottle: Omit<Bottle, 'id'>): Bottle => {
   };
   bottles.push(newBottle);
   localStorage.setItem(STORAGE_KEY_BOTTLES, JSON.stringify(bottles));
+  triggerSync();
   return newBottle;
 };
 
@@ -122,6 +162,7 @@ export const deleteBottle = (id: string): void => {
   const bottles = getBottles();
   const newBottles = bottles.filter(b => b.id !== id);
   localStorage.setItem(STORAGE_KEY_BOTTLES, JSON.stringify(newBottles));
+  triggerSync();
 };
 
 export const duplicateBottle = (id: string, count: number): void => {
@@ -146,6 +187,7 @@ export const duplicateBottle = (id: string, count: number): void => {
   }
   
   localStorage.setItem(STORAGE_KEY_BOTTLES, JSON.stringify(bottles));
+  triggerSync();
 };
 
 export const bulkSaveBottles = (newBottles: Omit<Bottle, 'id'>[]): void => {
@@ -160,6 +202,7 @@ export const bulkSaveBottles = (newBottles: Omit<Bottle, 'id'>[]): void => {
       });
   });
   localStorage.setItem(STORAGE_KEY_BOTTLES, JSON.stringify(bottles));
+  triggerSync();
 };
 
 export const updateBottle = (id: string, updates: Partial<Bottle>): Bottle | null => {
@@ -169,14 +212,16 @@ export const updateBottle = (id: string, updates: Partial<Bottle>): Bottle | nul
 
   bottles[index] = { ...bottles[index], ...updates };
   localStorage.setItem(STORAGE_KEY_BOTTLES, JSON.stringify(bottles));
+  triggerSync();
   return bottles[index];
 };
 
 export const moveBottle = (bottleId: string, storageId: string | undefined, coordinates?: Coordinates): Bottle | null => {
-  return updateBottle(bottleId, {
+  const result = updateBottle(bottleId, {
     storageId,
     coordinates: coordinates // If undefined, it removes the coordinates (making it loose in the cellar)
   });
+  return result;
 };
 
 export const consumeBottle = (id: string, rating: number, notes: string, occasion: string): void => {
