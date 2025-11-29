@@ -1,23 +1,24 @@
 import React, { useState } from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, PlusCircle, History, Wine, Settings, LogOut, RefreshCw } from 'lucide-react';
+import { LayoutDashboard, PlusCircle, History, Wine, Settings, LogOut, RefreshCw, CloudUpload } from 'lucide-react';
 import SearchBar from './SearchBar';
 import { useAuth } from '../context/AuthContext';
 import { useGoogleLogin } from '@react-oauth/google';
-import { syncFromCloud, setCloudSyncEnabled, initGapiClient } from '../services/cloudService';
+import { syncFromCloud, syncToCloud, setCloudSyncEnabled, initGapiClient } from '../services/cloudService';
 
 const Layout: React.FC = () => {
   const location = useLocation();
   const { user, logout } = useAuth();
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const isActive = (path: string) => location.pathname === path;
 
-  // Helper to re-auth and sync if token is expired/missing
+  // Sync Logic (Pull)
   const syncLogin = useGoogleLogin({
     onSuccess: async (tokenResponse) => {
       setIsSyncing(true);
       try {
-        await initGapiClient(); // Ensure gapi loaded
+        await initGapiClient(); 
         if (window.gapi && window.gapi.client) {
             window.gapi.client.setToken({ access_token: tokenResponse.access_token });
             setCloudSyncEnabled(true);
@@ -40,9 +41,35 @@ const Layout: React.FC = () => {
     overrideScope: true, 
   });
 
-  const handleSync = () => {
-      syncLogin();
-  };
+  // Force Save Logic (Push)
+  const saveLogin = useGoogleLogin({
+    onSuccess: async (tokenResponse) => {
+      setIsSaving(true);
+      try {
+        await initGapiClient(); 
+        if (window.gapi && window.gapi.client) {
+            window.gapi.client.setToken({ access_token: tokenResponse.access_token });
+            setCloudSyncEnabled(true);
+            const success = await syncToCloud();
+            if (success) {
+                alert("Successfully saved to Google Drive!");
+            } else {
+                alert("Failed to save to cloud.");
+            }
+        }
+      } catch (e) {
+        console.error("Save failed", e);
+        alert("Save failed. Check console.");
+      } finally {
+        setIsSaving(false);
+      }
+    },
+    scope: 'https://www.googleapis.com/auth/drive.file',
+    overrideScope: true, 
+  });
+
+  const handleSync = () => syncLogin();
+  const handleForceSave = () => saveLogin();
 
   const navItems = [
     { path: '/', label: 'Dashboard', icon: <LayoutDashboard size={20} /> },
@@ -120,13 +147,25 @@ const Layout: React.FC = () => {
                         <LogOut size={16} />
                     </button>
                 </div>
-                <button 
-                    onClick={handleSync}
-                    className="w-full flex items-center justify-center gap-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 py-2 rounded text-xs font-medium transition-colors"
-                >
-                    <RefreshCw size={14} className={isSyncing ? 'animate-spin' : ''} />
-                    {isSyncing ? 'Syncing...' : 'Sync from Cloud'}
-                </button>
+                
+                <div className="grid grid-cols-2 gap-2">
+                    <button 
+                        onClick={handleSync}
+                        className="flex flex-col items-center justify-center gap-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 py-2 rounded text-[10px] font-medium transition-colors border border-zinc-700"
+                        title="Download from Cloud"
+                    >
+                        <RefreshCw size={14} className={isSyncing ? 'animate-spin' : ''} />
+                        Sync Down
+                    </button>
+                    <button 
+                        onClick={handleForceSave}
+                        className="flex flex-col items-center justify-center gap-1 bg-rose-900/30 hover:bg-rose-900/50 text-rose-200 py-2 rounded text-[10px] font-medium transition-colors border border-rose-900/50"
+                        title="Upload to Cloud"
+                    >
+                        <CloudUpload size={14} className={isSaving ? 'animate-bounce' : ''} />
+                        Force Save
+                    </button>
+                </div>
             </div>
           ) : (
              <p className="text-xs text-center text-zinc-500 mb-2">Guest Mode</p>

@@ -1,8 +1,7 @@
-
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, Wine, Grid3X3, Coins, Upload, AlertCircle } from 'lucide-react';
-import { getCellars, getStats, getSettings, getUnplacedBottles } from '../services/storageService';
+import { Plus, Wine, Grid3X3, Coins, Upload, AlertCircle, RefreshCcw, DownloadCloud } from 'lucide-react';
+import { getCellars, getStats, getSettings, getUnplacedBottles, fullRestore } from '../services/storageService';
 import { StorageUnit, Stats, UserSettings, Bottle } from '../types';
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, Cell } from 'recharts';
 
@@ -11,6 +10,7 @@ const Dashboard: React.FC = () => {
   const [stats, setStats] = useState<Stats | null>(null);
   const [settings, setSettings] = useState<UserSettings>({ currency: 'USD', currencySymbol: '$' });
   const [unplacedBottles, setUnplacedBottles] = useState<Bottle[]>([]);
+  const restoreInputRef = useRef<HTMLInputElement>(null);
   
   // Default to producer as requested
   const [sortBy] = useState<'producer'>('producer');
@@ -33,6 +33,38 @@ const Dashboard: React.FC = () => {
     });
   };
 
+  const handleRestoreBackup = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!window.confirm("Warning: Restoring a backup will OVERWRITE all current data. Continue?")) {
+        // Reset input
+        if (restoreInputRef.current) restoreInputRef.current.value = '';
+        return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const jsonString = event.target?.result as string;
+        fullRestore(jsonString);
+        alert("Backup restored successfully!");
+        refreshData();
+        // Force reload to ensure all state everywhere is clean
+        window.location.reload();
+      } catch (err) {
+        console.error("Restore failed", err);
+        alert("Failed to restore backup. Invalid file format.");
+      }
+    };
+    reader.readAsText(file);
+    
+    // Reset input so same file can be selected again if needed
+    if (restoreInputRef.current) {
+        restoreInputRef.current.value = '';
+    }
+  };
+
   const sortedUnplaced = getSortedUnplacedBottles();
 
   const chartData = stats ? [
@@ -50,11 +82,27 @@ const Dashboard: React.FC = () => {
           <p className="text-zinc-400">Manage your wines and inventory.</p>
         </div>
         <div className="flex gap-3">
-          <Link to="/import" className="bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-4 py-2 rounded-lg flex items-center gap-2 font-medium transition-colors border border-zinc-700">
-            <Upload size={18} />
+          <input 
+            type="file" 
+            ref={restoreInputRef} 
+            accept=".json" 
+            className="hidden" 
+            onChange={handleRestoreBackup}
+          />
+          <button 
+            onClick={() => restoreInputRef.current?.click()}
+            className="bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white px-4 py-2 rounded-lg flex items-center gap-2 font-medium transition-colors border border-zinc-700 text-sm"
+            title="Overwrite current library with a JSON backup file"
+          >
+            <RefreshCcw size={16} />
+            <span className="hidden md:inline">Restore Backup</span>
+          </button>
+          
+          <Link to="/import" className="bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-4 py-2 rounded-lg flex items-center gap-2 font-medium transition-colors border border-zinc-700 text-sm" title="Add bottles from a CSV spreadsheet">
+            <Upload size={16} />
             <span className="hidden md:inline">Import CSV</span>
           </Link>
-          <Link to="/add-bottle" className="bg-rose-600 hover:bg-rose-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 font-medium transition-colors shadow-lg shadow-rose-900/20">
+          <Link to="/add-bottle" className="bg-rose-600 hover:bg-rose-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 font-medium transition-colors shadow-lg shadow-rose-900/20 text-sm">
             <Plus size={18} />
             <span>Add Bottle</span>
           </Link>

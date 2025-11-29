@@ -35,8 +35,12 @@ export const importData = (jsonString: string): void => {
     if (data.settings) localStorage.setItem(STORAGE_KEY_SETTINGS, JSON.stringify(data.settings));
   } catch (e) {
     console.error("Failed to import data", e);
+    throw e; // Re-throw to allow UI to catch invalid JSON
   }
 };
+
+// Alias for semantic clarity when using "Restore from Backup" feature
+export const fullRestore = importData;
 
 // --- Settings ---
 

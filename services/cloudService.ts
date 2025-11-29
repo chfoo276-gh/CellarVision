@@ -141,15 +141,15 @@ export const syncFromCloud = async (accessToken: string): Promise<boolean> => {
   }
 };
 
-export const syncToCloud = async (): Promise<void> => {
+export const syncToCloud = async (): Promise<boolean> => {
   try {
     const gapi = window.gapi;
-    if (!gapi || !gapi.client) return;
+    if (!gapi || !gapi.client) return false;
 
     const data = exportData();
     
     const tokenObj = gapi.client.getToken();
-    if (!tokenObj || !tokenObj.access_token) return;
+    if (!tokenObj || !tokenObj.access_token) return false;
 
     const fileId = await findDbFile();
 
@@ -175,8 +175,10 @@ export const syncToCloud = async (): Promise<void> => {
       });
     }
     console.log("Synced to cloud successfully");
+    return true;
   } catch (err) {
     console.error("Error syncing to cloud", err);
+    return false;
   }
 };
 

@@ -1,7 +1,6 @@
-
 import React, { useState, useEffect } from 'react';
-import { Save, ArrowLeft, Settings as SettingsIcon } from 'lucide-react';
-import { getSettings, saveSettings } from '../services/storageService';
+import { Save, ArrowLeft, Settings as SettingsIcon, Download } from 'lucide-react';
+import { getSettings, saveSettings, exportData } from '../services/storageService';
 import { UserSettings } from '../types';
 import { useNavigate } from 'react-router-dom';
 
@@ -24,11 +23,11 @@ const Settings: React.FC = () => {
   }, []);
 
   const currencies = [
+    { code: 'HKD', symbol: 'HK$', name: 'Hong Kong Dollar' },
     { code: 'USD', symbol: '$', name: 'US Dollar' },
     { code: 'EUR', symbol: '€', name: 'Euro' },
     { code: 'GBP', symbol: '£', name: 'British Pound' },
     { code: 'JPY', symbol: '¥', name: 'Japanese Yen' },
-    { code: 'HKD', symbol: 'HK$', name: 'Hong Kong Dollar' },
     { code: 'AUD', symbol: '$', name: 'Australian Dollar' },
     { code: 'CAD', symbol: '$', name: 'Canadian Dollar' },
     { code: 'CHF', symbol: 'CHF', name: 'Swiss Franc' },
@@ -40,7 +39,7 @@ const Settings: React.FC = () => {
     let finalSettings = { ...settings };
     if (isCustom) {
       finalSettings = {
-        currency: 'Custom', // Or keep 'Custom' as a UI state and store the code? Let's use 'Custom' for UI logic but store the code if we want logic elsewhere. For now, let's strictly store what user typed.
+        currency: 'Custom',
         customCurrencyCode: customCode,
         currencySymbol: customSymbol
       };
@@ -65,6 +64,18 @@ const Settings: React.FC = () => {
     }
   };
 
+  const handleExport = () => {
+      const dataStr = exportData();
+      const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+      
+      const exportFileDefaultName = `cellarvision_backup_${new Date().toISOString().slice(0,10)}.json`;
+      
+      const linkElement = document.createElement('a');
+      linkElement.setAttribute('href', dataUri);
+      linkElement.setAttribute('download', exportFileDefaultName);
+      linkElement.click();
+  };
+
   return (
     <div className="max-w-2xl mx-auto space-y-6 animate-fade-in">
       <div className="flex items-center gap-2">
@@ -84,7 +95,6 @@ const Settings: React.FC = () => {
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-zinc-400 mb-2">Currency</label>
-              <p className="text-xs text-zinc-500 mb-2">Used for calculating total collection value.</p>
               <select
                 value={isCustom ? 'Custom' : settings.currency}
                 onChange={handleCurrencyChange}
@@ -134,6 +144,20 @@ const Settings: React.FC = () => {
             {saved ? 'Saved!' : 'Save Settings'}
           </button>
         </div>
+      </div>
+
+      <div className="bg-zinc-900 p-6 rounded-xl border border-zinc-800">
+          <h2 className="text-xl font-semibold mb-4 text-zinc-100">Data & Backup</h2>
+          <p className="text-sm text-zinc-400 mb-4">
+              Download a copy of your library to share with others or keep as a backup.
+          </p>
+          <button
+            onClick={handleExport}
+            className="w-full bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-bold py-3 px-4 rounded-lg flex items-center justify-center gap-2 transition-colors border border-zinc-700"
+          >
+            <Download size={20} />
+            Export Backup (JSON)
+          </button>
       </div>
     </div>
   );
