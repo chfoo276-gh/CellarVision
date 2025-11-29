@@ -1,12 +1,5 @@
-
 import { GoogleGenAI, Type } from "@google/genai";
 import { WineType } from "../types";
-
-// Note: In a real production app, never expose keys on client side.
-// This is for the MVP/Demo environment where process.env.API_KEY is injected.
-const API_KEY = process.env.API_KEY || '';
-
-const ai = new GoogleGenAI({ apiKey: API_KEY });
 
 export interface ScannedWineData {
   producer: string;
@@ -18,9 +11,17 @@ export interface ScannedWineData {
 }
 
 export const analyzeWineLabel = async (base64Image: string): Promise<ScannedWineData> => {
-  if (!API_KEY) {
-    throw new Error("API Key is missing. Please check your configuration.");
+  // The API key is obtained exclusively from process.env.API_KEY as per guidelines.
+  // Ensure VITE_API_KEY is set in your Vercel environment variables, which vite.config.ts maps to this.
+  const apiKey = process.env.API_KEY;
+
+  if (!apiKey) {
+    console.error("Missing API Key. Ensure VITE_API_KEY is set in Vercel environment variables.");
+    throw new Error("API Key not configured.");
   }
+
+  // Initialize lazily to prevent app crash on load if key is missing
+  const ai = new GoogleGenAI({ apiKey });
 
   // Remove data URL prefix if present (e.g., "data:image/jpeg;base64,")
   const cleanBase64 = base64Image.replace(/^data:image\/(png|jpeg|jpg|webp);base64,/, "");
