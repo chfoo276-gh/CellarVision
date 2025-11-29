@@ -23,7 +23,7 @@ const getClientId = () => {
 
   if (!id) {
     try {
-      // Fallback to process.env if polyfilled
+      // Fallback to process.env if polyfilled via vite.config.ts
       // @ts-ignore
       if (typeof process !== 'undefined' && process.env && process.env.VITE_GOOGLE_CLIENT_ID) {
         // @ts-ignore
@@ -35,7 +35,7 @@ const getClientId = () => {
   }
 
   // GoogleOAuthProvider crashes if clientId is empty or undefined.
-  // Return a placeholder to allow the app to boot and show the "Config Required" screen in Login.tsx
+  // Return a placeholder if missing to allow the app to boot and show the "Config Required" screen in Login.tsx
   return id || "NO_CLIENT_ID_CONFIGURED";
 };
 

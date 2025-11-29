@@ -1,7 +1,7 @@
 import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Wine, Loader2, AlertTriangle, ExternalLink } from 'lucide-react';
+import { Wine, Loader2, AlertTriangle } from 'lucide-react';
 
 const Login: React.FC = () => {
   const { login, user, isLoading } = useAuth();
@@ -9,10 +9,20 @@ const Login: React.FC = () => {
 
   const from = (location.state as any)?.from?.pathname || '/';
 
-  // Check if Client ID is configured
-  const hasClientId = 
-    (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_GOOGLE_CLIENT_ID) ||
-    (typeof process !== 'undefined' && process.env && process.env.VITE_GOOGLE_CLIENT_ID);
+  // Check if Client ID is configured via Environment Variables
+  // We check if the ID passed to provider (which we can't easily access here without complex context) 
+  // OR we just check the source env vars again.
+  const hasClientId = (() => {
+      try {
+        // @ts-ignore
+        if (import.meta.env.VITE_GOOGLE_CLIENT_ID) return true;
+      } catch {}
+      try {
+        // @ts-ignore
+        if (process.env.VITE_GOOGLE_CLIENT_ID) return true;
+      } catch {}
+      return false;
+  })();
 
   if (isLoading) {
       return (

@@ -7,6 +7,11 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
   return {
     plugins: [react()],
+    server: {
+      port: 5173,
+      strictPort: true, // Fail if port 5173 is busy, don't jump to 5174
+      host: '127.0.0.1', // Force IPv4 to match common OAuth configs
+    },
     define: {
       // Polyfill process.env for libs that expect it or for fallback access
       'process.env': {
