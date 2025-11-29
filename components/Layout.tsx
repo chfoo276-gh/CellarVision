@@ -1,13 +1,48 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, PlusCircle, History, Wine, Settings, LogOut } from 'lucide-react';
+import { LayoutDashboard, PlusCircle, History, Wine, Settings, LogOut, RefreshCw } from 'lucide-react';
 import SearchBar from './SearchBar';
 import { useAuth } from '../context/AuthContext';
+import { useGoogleLogin } from '@react-oauth/google';
+import { syncFromCloud, setCloudSyncEnabled, initGapiClient } from '../services/cloudService';
 
 const Layout: React.FC = () => {
   const location = useLocation();
   const { user, logout } = useAuth();
+  const [isSyncing, setIsSyncing] = useState(false);
   const isActive = (path: string) => location.pathname === path;
+
+  // Helper to re-auth and sync if token is expired/missing
+  const syncLogin = useGoogleLogin({
+    onSuccess: async (tokenResponse) => {
+      setIsSyncing(true);
+      try {
+        await initGapiClient(); // Ensure gapi loaded
+        if (window.gapi && window.gapi.client) {
+            window.gapi.client.setToken({ access_token: tokenResponse.access_token });
+            setCloudSyncEnabled(true);
+            const success = await syncFromCloud(tokenResponse.access_token);
+            if (success) {
+                alert("Sync Complete! Page will reload.");
+                window.location.reload(); 
+            } else {
+                alert("No cloud data found to sync.");
+            }
+        }
+      } catch (e) {
+        console.error("Sync failed", e);
+        alert("Sync failed. Check console.");
+      } finally {
+        setIsSyncing(false);
+      }
+    },
+    scope: 'https://www.googleapis.com/auth/drive.file',
+    overrideScope: true, 
+  });
+
+  const handleSync = () => {
+      syncLogin();
+  };
 
   const navItems = [
     { path: '/', label: 'Dashboard', icon: <LayoutDashboard size={20} /> },
@@ -26,9 +61,14 @@ const Layout: React.FC = () => {
             <span className="font-bold text-lg">CellarVision</span>
           </div>
           {user && (
-            <button onClick={logout} className="text-zinc-500 hover:text-white">
-              <LogOut size={20} />
-            </button>
+            <div className="flex gap-4">
+                <button onClick={handleSync} className={`text-zinc-500 hover:text-emerald-500 ${isSyncing ? 'animate-spin' : ''}`}>
+                    <RefreshCw size={20} />
+                </button>
+                <button onClick={logout} className="text-zinc-500 hover:text-white">
+                    <LogOut size={20} />
+                </button>
+            </div>
           )}
         </div>
         <div className="px-4 pb-3">
@@ -66,23 +106,32 @@ const Layout: React.FC = () => {
 
         <div className="p-4 border-t border-zinc-800">
           {user ? (
-            <div className="flex items-center justify-between px-2 mb-3">
-               <div className="flex items-center gap-2 overflow-hidden">
-                  {user.picture ? (
-                    <img src={user.picture} alt="User" className="w-6 h-6 rounded-full" />
-                  ) : (
-                    <div className="w-6 h-6 rounded-full bg-zinc-700 flex items-center justify-center text-xs">{user.name.charAt(0)}</div>
-                  )}
-                  <span className="text-sm font-medium text-zinc-400 truncate">{user.name}</span>
-               </div>
-               <button onClick={logout} className="text-zinc-500 hover:text-rose-500 transition-colors" title="Logout">
-                  <LogOut size={16} />
-               </button>
+            <div className="space-y-3">
+                <div className="flex items-center justify-between px-2">
+                    <div className="flex items-center gap-2 overflow-hidden">
+                        {user.picture ? (
+                            <img src={user.picture} alt="User" className="w-6 h-6 rounded-full" />
+                        ) : (
+                            <div className="w-6 h-6 rounded-full bg-zinc-700 flex items-center justify-center text-xs">{user.name.charAt(0)}</div>
+                        )}
+                        <span className="text-sm font-medium text-zinc-400 truncate w-24">{user.name}</span>
+                    </div>
+                    <button onClick={logout} className="text-zinc-500 hover:text-rose-500 transition-colors" title="Logout">
+                        <LogOut size={16} />
+                    </button>
+                </div>
+                <button 
+                    onClick={handleSync}
+                    className="w-full flex items-center justify-center gap-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 py-2 rounded text-xs font-medium transition-colors"
+                >
+                    <RefreshCw size={14} className={isSyncing ? 'animate-spin' : ''} />
+                    {isSyncing ? 'Syncing...' : 'Sync from Cloud'}
+                </button>
             </div>
           ) : (
              <p className="text-xs text-center text-zinc-500 mb-2">Guest Mode</p>
           )}
-          <p className="text-xs text-zinc-700 text-center">MVP Version 1.1</p>
+          <p className="text-xs text-zinc-700 text-center mt-3">MVP Version 1.1</p>
         </div>
       </div>
 

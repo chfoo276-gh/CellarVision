@@ -31,6 +31,12 @@ export const exportData = (): string => {
   });
 };
 
+export const clearAllData = (): void => {
+    localStorage.removeItem(STORAGE_KEY_CELLARS);
+    localStorage.removeItem(STORAGE_KEY_BOTTLES);
+    localStorage.removeItem(STORAGE_KEY_SETTINGS);
+};
+
 export const importData = (jsonString: string): void => {
   try {
     const data = JSON.parse(jsonString);

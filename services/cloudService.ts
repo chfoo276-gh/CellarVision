@@ -1,4 +1,7 @@
-import { exportData, importData } from './storageService';
+import { exportData, importData, setCloudSyncEnabled as setSync } from './storageService';
+
+// Re-export for Layout to use
+export const setCloudSyncEnabled = setSync;
 
 const DISCOVERY_DOCS = ["https://www.googleapis.com/discovery/v1/apis/drive/v3/rest"];
 const DB_FILE_NAME = "cellarvision_db.json";
